@@ -1,0 +1,84 @@
+Metadata-Version: 2.4
+Name: lichess-predictor
+Version: 0.1.0
+Summary: Stream Lichess PGN.zst games and train position win-probability models.
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: chess>=1.11
+Requires-Dist: numpy>=1.24
+Requires-Dist: zstandard>=0.23
+Provides-Extra: torch
+Requires-Dist: torch>=2.3; extra == "torch"
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+
+# Lichess Predictor
+
+Train a model that estimates the expected score of the side to move from a Lichess game position. A prediction of `1.0` means the side to move eventually won, `0.0` means they eventually lost, and draws are trained as `0.5`.
+
+## Feature Set
+
+The pipeline turns each sampled ply into two feature groups:
+
+- Board tensor: 16 planes, oriented from the side-to-move perspective. It includes own pieces, opponent pieces, and castling rights.
+- Game context vector: ratings for side/opponent, rating difference, time control, clock fractions, side-to-move engine eval from PGN comments when present, ply, material balance, rated flag, title flags, speed bucket, and ECO bucket.
+
+The extractor intentionally excludes final-only leakage such as `Termination` and rating diff. Those are useful for analysis but should not be available when predicting an in-game position.
+
+## Model Architecture
+
+The production model in `HybridWinModel` is a hybrid neural net:
+
+- A compact CNN encodes the 8x8 board tensor.
+- An MLP encodes tabular context such as ratings, clock, time control, and eval.
+- A fused head outputs one logit trained with binary cross entropy on expected score labels.
+
+This is a good first architecture because it keeps the board spatial, lets non-board context matter, and can stream minibatches without preprocessing the full 2 TB corpus. For very large training runs, the next upgrade would be residual blocks plus embeddings for high-cardinality metadata such as opening, player pool, month, and time-control family.
+
+When PyTorch is unavailable, the CLI falls back to a NumPy online logistic model so the parser and labels can still be smoke-tested.
+
+## Install
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
+```
+
+For the neural model:
+
+```bash
+.venv/bin/python -m pip install -e '.[torch]'
+```
+
+## Run On A Sample
+
+```bash
+.venv/bin/python -m lichess_predictor.cli inspect tests/fixtures/sample.pgn --max-examples 3
+
+.venv/bin/python -m lichess_predictor.cli train tests/fixtures/sample.pgn \
+  --backend auto \
+  --max-games 1 \
+  --sample-every-n-plies 1 \
+  --batch-size 8 \
+  --epochs 3
+```
+
+The same commands work on compressed Lichess shards:
+
+```bash
+.venv/bin/python -m lichess_predictor.cli train data/raw/lichess_db_standard_rated_2024-01.pgn.zst \
+  --backend torch \
+  --max-games 100000 \
+  --sample-every-n-plies 6 \
+  --batch-size 1024 \
+  --output data/checkpoints/standard-2024-01.pt
+```
+
+## Scaling Notes
+
+- Stream `.pgn.zst` directly with `zstandard`; never decompress full monthly shards to disk.
+- Cap `--max-games` and `--max-positions` for experiments, then increase shard coverage gradually.
+- Use `--sample-every-n-plies` to reduce correlation and control the positions-per-game multiplier.
+- Train by month or by a shuffled manifest of monthly files. For multi-worker training, assign whole shards to workers to avoid seeking inside zstd streams.
+- Keep validation temporally separated, for example train on older months and validate on a newer month.
+- Filter bots by default. Consider separate models for bullet/blitz/rapid/classical because clock pressure changes outcome probabilities.

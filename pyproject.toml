@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lichess-predictor"
+version = "0.1.0"
+description = "Stream Lichess PGN.zst games and train position win-probability models."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "chess>=1.11",
+  "numpy>=1.24",
+  "zstandard>=0.23",
+]
+
+[project.optional-dependencies]
+torch = ["torch>=2.3"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+lichess-predictor = "lichess_predictor.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

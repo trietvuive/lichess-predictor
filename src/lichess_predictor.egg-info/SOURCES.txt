@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+src/lichess_predictor/__init__.py
+src/lichess_predictor/cli.py
+src/lichess_predictor/features.py
+src/lichess_predictor/model.py
+src/lichess_predictor/stream.py
+src/lichess_predictor/train.py
+src/lichess_predictor.egg-info/PKG-INFO
+src/lichess_predictor.egg-info/SOURCES.txt
+src/lichess_predictor.egg-info/dependency_links.txt
+src/lichess_predictor.egg-info/entry_points.txt
+src/lichess_predictor.egg-info/requires.txt
+src/lichess_predictor.egg-info/top_level.txt
+tests/test_features.py
