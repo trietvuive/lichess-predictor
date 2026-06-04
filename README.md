@@ -2,6 +2,8 @@
 
 Train a model that estimates the expected score of the side to move from a Lichess game position. A prediction of `1.0` means the side to move eventually won, `0.0` means they eventually lost, and draws are trained as `0.5`.
 
+Database [here](https://database.lichess.org/)
+
 ## Run On A Sample
 
 ```bash
